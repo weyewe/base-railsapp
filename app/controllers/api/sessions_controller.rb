@@ -9,12 +9,16 @@ class Api::SessionsController < Api::BaseApiController
   respond_to :json
   
   
+  def authenticate_auth_token
+    render :json => {:success => true }
+  end
+  
   def create
-    user_password = params[:session][:password]
-    user_email = params[:session][:email]
-    user = user_email.present? && User.find_by(email: user_email)
+    user_password = params[:user_login][:password]
+    user_email = params[:user_login][:email]
+    user =   User.find_by(email: user_email)
 
-    if user.valid_password? user_password
+    if user and user.valid_password?( user_password )
       sign_in user, store: false
       user.generate_authentication_token!
       user.save
@@ -23,7 +27,7 @@ class Api::SessionsController < Api::BaseApiController
                 :success=>true, 
                 :auth_token=>user.auth_token, 
                 :email=>user.email,
-                :role => user.role.to_json
+#                 :role => user.role.to_json
               }
       
       
@@ -34,10 +38,19 @@ class Api::SessionsController < Api::BaseApiController
   end
   
   def destroy
-    user = User.find_by(auth_token: params[:id])
-    user.generate_authentication_token!
-    user.save
-    head 204
+
+    
+    resource = User.find_by_auth_token( params[:auth_token])
+    if resource
+      resource.generate_authentication_token!
+      
+      if  resource.save
+        render :json=> {:success=>true}
+      else
+        render :json=> {:success=>false}
+      end
+
+    end
   end
   
 #   http://apionrails.icalialabs.com/book/chapter_five

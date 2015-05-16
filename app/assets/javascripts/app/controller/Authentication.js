@@ -46,6 +46,9 @@ Ext.define("AM.controller.Authentication", {
               // window.location.reload();
           }
       });
+    }else{
+      console.log("There is no current users");
+      
     }
 
     // main navigation specific UI 
@@ -60,19 +63,19 @@ Ext.define("AM.controller.Authentication", {
 
 
   onViewportLoaded: function(){
-    this.showProtectedArea(); 
+//     this.showProtectedArea(); 
     
 //     // console.log("onViewportLoaded");
-//     var me = this;
-//     var currentUserBase = localStorage.getItem('currentUser');
+    var me = this;
+    var currentUserBase = localStorage.getItem('currentUser');
     
-//     if( currentUserBase === null){
-//       me.showLoginForm(); 
-//     }else{
-//       me.currentUser = Ext.decode( currentUserBase ) ;
+    if( currentUserBase === null){
+      me.showLoginForm(); 
+    }else{
+      me.currentUser = Ext.decode( currentUserBase ) ;
 
-//       me.showProtectedArea(); 
-//     }
+      me.showProtectedArea(); 
+    }
   },
 
   init : function( application ) {
@@ -147,7 +150,12 @@ Ext.define("AM.controller.Authentication", {
         failure: function(result, request ) {
             me.getViewport().setLoading( false ) ;
             Ext.Msg.alert("Logout Error", "Can't Logout");
+            me.currentUser  = null; 
+            localStorage.removeItem('currentUser');
+//             me.showLoginForm();
             window.location.reload(); 
+          
+//             window.location.reload(); 
         }
     });
   },

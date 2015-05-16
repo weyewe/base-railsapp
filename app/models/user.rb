@@ -5,13 +5,116 @@ class User < ActiveRecord::Base
          :recoverable, :rememberable, :trackable, :validatable
   validates :auth_token, uniqueness: true
   before_create :generate_authentication_token!
+  include TheRole::Api::User
   
+  validates_uniqueness_of :email 
+  validates_presence_of :email  , :role_id 
+  
+  validate :valid_role
+  
+  def valid_role
+    return if not role_id.present?
+    
+    if role_id == 0
+      errors.add(:role_id, "Role harus dipilih")
+    end
+  end
   
   def generate_authentication_token!
     begin
       self.auth_token = Devise.friendly_token
     end while self.class.exists?(auth_token: auth_token)
   end
+    
+  def self.create_main_user(params) 
+    new_user = User.new( :email => params[:email], 
+                            :password => params[:password],
+                            :password => params[:password_confirmation]  )
+    new_user = User.new
+    new_user.email = params[:email]
+    new_user.password = params[:password]
+    new_user.password_confirmation = params[:password_confirmation]
+    admin_role = Role.find_by_name ROLE_NAME[:admin]
+    new_user.role_id = admin_role.id 
+    new_user.is_main_user = true
+    
+    new_user.save 
+  
+    return new_user 
+  end
+  
+  def self.active_objects
+    self.where(:is_deleted => false).order("id DESC")
+  end
+  
+  def delete_object 
+    
+    if self.is_main_user
+      self.errors.add(:generic_errors, "Tidak dapat delete user utama")
+      return self 
+    end
+    
+    random_password                    = UUIDTools::UUID.timestamp_create.to_s[0..7]
+    self.password = random_password
+    self.password_confirmation = random_password 
+    self.is_deleted = true 
+    self.save 
+  end
+    
+   # only used in seeds.rb => we need to assign pre-determined password
+  def User.create_object(params)
+    new_object                        = User.new 
+    password                         = "willy1234" #UUIDTools::UUID.timestamp_create.to_s[0..7]
+    new_object.email                 = params[:email] 
+    new_object.role_id               =   params[:role_id]
+    
+    new_object.password              = password
+    new_object.password_confirmation = password 
+    
+    new_object.save
+
+    if new_object.valid? and Rails.env.production? 
+      # UserMailer.notify_new_user_registration( new_object , password    ).deliver 
+    end
+    
+    return new_object
+  end
+   
+  def update_object( params )
+    admin_role = Role.find_by_name ROLE_NAME[:admin]
+    
+    self.name                  = params[:name]
+    self.email                 = params[:email] 
+    
+    
+    if  self.is_main_user == true  
+      self.role_id               = admin_role.id    
+    else
+      self.role_id = params[:role_id]
+    end 
+    
+    self.save
+    return self
+  end
+  
+  
+  
+  def update_password(  params) 
+    self.password = params[:password]
+    self.password_confirmation = params[:password_confirmation]
+    
+    self.save 
+    
+    return self 
+  end
+    
+  def set_as_main_user 
+    admin_role = Role.find_by_name ROLE_NAME[:admin]
+    self.role_id = admin_role.id 
+    self.is_main_user = true 
+    self.save 
+  end
+  
     
     
 end
