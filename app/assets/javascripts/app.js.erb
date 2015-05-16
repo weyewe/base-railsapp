@@ -1,0 +1,157 @@
+// Set valid ExtJS loading path (/vendor/assets/extjs4/src)
+// Ext.Loader.setPath('Ext', '/assets/extjs4/src');
+// Ext.Loader.setConfig({
+// 	enabled:true  
+// });
+// 
+// Ext.Loader.setConfig({
+//     enabled: true,
+//     paths: {
+//         'Ext.calendar': './app/src'
+//     }
+// });
+
+
+
+
+
+
+
+
+
+
+Ext.Loader.setConfig({ enabled: false });
+
+Ext.application({
+  <% Dir[File.expand_path('../app/*/', __FILE__)].each do |subdir| %>
+    <% next if File.basename(subdir) == 'src' %> 
+
+    <%= File.basename(subdir) %>s: <%=
+    # omit all file extensions (js, js.erb, etc.) from the file name
+    Dir[subdir + '/*.js*'].map {|f| File.basename(f)[/^[^.]+/] }.to_json
+    %>,
+  <% end %>
+
+// ... the rest of your ExtJS 4 application definition goes here ...
+// the global namespace
+   name: 'AM',
+   appFolder: '/assets/app',
+   autoCreateViewport: true,
+});
+
+
+
+
+
+
+Ext.override(Ext.Container, {
+  removeAll: function() {
+      this.items.each(function(childItem){ this.remove(childItem);}, this);
+  }
+});
+
+
+
+
+
+Ext.define("AM.view.Constants",{
+  singleton: true,
+
+  LOGIN_URL: "/login.do",
+  LOGOUT_URL: "/logout.do",
+
+  GET_USERS_URL:  "/users/all",
+  GET_USER_URL: "/users/get",
+
+  account_case: {
+    group : 1 , 
+    ledger : 2
+  },
+
+  switchPersonalReport : 0,
+  switchOperation : 1 ,
+  switchMaster : 2 ,  
+});
+
+
+
+Ext.define("AM.currentUser",{
+  singleton: true,
+
+  LOGIN_URL: "/login.do",
+  LOGOUT_URL: "/logout.do",
+
+  GET_USERS_URL:  "/users/all",
+  GET_USER_URL: "/users/get",
+
+  hasRole : function(controller, action){
+    // console.log("Inside the hasRole");
+    var currentUser = Ext.decode( localStorage.getItem('currentUser'));
+
+    if( !currentUser || !currentUser['role'] ){
+      return false; 
+    }
+
+    if( 
+        (
+          currentUser['role']['system'] &&
+          currentUser['role']['system']['administrator']  
+        ) || 
+        (
+            currentUser['role'][controller] && 
+            currentUser['role'][controller][action]  
+        ) ){
+
+      return true; 
+    }else{
+      return false; 
+    }
+
+
+  }
+});
+
+
+Ext.onReady(function(){
+  AM.view.Constants['moron'] = 'Awesome';
+
+  Ext.Ajax.on('beforerequest', function(conn, options) {
+    // always include the auth_token.. 
+    var currentUser = Ext.decode( localStorage.getItem('currentUser'));
+
+    if( currentUser !== null){
+      var auth_token_value = currentUser['auth_token'];
+      Ext.Ajax.extraParams = { auth_token: auth_token_value };
+    }
+
+    // include the csrf prevention 
+    var content, metatag;
+    metatag = Ext.select('meta[name="csrf-token"]');
+    if (metatag.first() != null) {
+      content = metatag.first().dom.content;
+      options.headers || (options.headers = {});
+      return options.headers["X-CSRF-Token"] = content;
+    }
+  }, this);
+
+  Ext.Ajax.on('requestcomplete', function(conn, response, options, eOpts){
+    var responseText=  response.responseText; 
+    var data = Ext.decode(responseText ); 
+
+    if( data['auth_token_invalid'] !== undefined && data['auth_token_invalid'] === true ){
+      Ext.Msg.alert("Login Error", "The authentication token is expired. Please retry login");
+    }
+
+    if( data['access_denied'] ){
+      Ext.Msg.alert("Tidak Berizin",  data['access_denied']);
+    }
+
+    if( data['message'] && data['message']['errors']  && data['message']['errors']['generic_errors']){
+      Ext.Msg.alert("Gagal",  data['message']['errors']['generic_errors']);
+    }
+  });
+
+});
+
+
+
